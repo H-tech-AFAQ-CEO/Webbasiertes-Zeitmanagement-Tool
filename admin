@@ -1,0 +1,12 @@
+<?php
+/**
+ * TimeTrack Pro - Admin Router
+ * Routes /admin to admin.php with authentication
+ */
+
+session_start();
+
+// Redirect to main admin interface
+header('Location: admin.php');
+exit;
+?>

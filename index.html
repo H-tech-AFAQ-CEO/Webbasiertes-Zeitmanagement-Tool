@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeTrack Pro — Zeiterfassung</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg: #0b0f1a;
+            --surface: #111827;
+            --surface2: #1a2235;
+            --surface3: #243044;
+            --border: rgba(255, 255, 255, 0.07);
+            --border2: rgba(255, 255, 255, 0.12);
+            --accent: #3b82f6;
+            --accent2: #6366f1;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --green: #10b981;
+            --green-glow: rgba(16, 185, 129, 0.2);
+            --amber: #f59e0b;
+            --amber-glow: rgba(245, 158, 11, 0.2);
+            --red: #ef4444;
+            --red-glow: rgba(239, 68, 68, 0.2);
+            --text: #f1f5f9;
+            --text2: #94a3b8;
+            --text3: #64748b;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -30%;
+            left: -20%;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -20%;
+            right: -15%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-wrapper {
+            position: relative;
+            z-index: 1;
+            max-width: 540px;
+            margin: 0 auto;
+            padding: 20px 16px 40px;
+            min-height: 100vh;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0 28px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        .logo-text {
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .logo-text span {
+            color: var(--accent);
+        }
+
+        .live-clock {
+            text-align: right;
+        }
+
+        .live-clock .time {
+            font-family: 'DM Mono', monospace;
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .live-clock .date {
+            font-size: 11px;
+            color: var(--text3);
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
+        .status-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(20px);
+        }
+
+        .status-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text3);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .status-value {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text3);
+            box-shadow: none;
+            transition: all 0.4s;
+        }
+
+        .status-dot.active {
+            background: var(--green);
+            box-shadow: 0 0 0 4px var(--green-glow);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 4px var(--green-glow);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px transparent;
+            }
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(20px);
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .card-icon.blue {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+        }
+
+        .card-icon.green {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
+        .card-icon.amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber);
+        }
+
+        .card-icon.purple {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent2);
+        }
+
+        .card-icon.red {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.1px;
+        }
+
+        .card-subtitle {
+            font-size: 11px;
+            color: var(--text3);
+            margin-top: 1px;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .field-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 6px;
+        }
+
+        .field-input {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: var(--radius-sm);
+            padding: 13px 16px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text);
+            outline: none;
+            transition: all 0.2s;
+            -webkit-appearance: none;
+        }
+
+        .field-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+            background: var(--surface3);
+        }
+
+        .field-input::placeholder {
+            color: var(--text3);
+            font-weight: 400;
+        }
+
+        .field-input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.5);
+            cursor: pointer;
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn-grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        .action-btn {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 14px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border2);
+            background: var(--surface2);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .action-btn:active {
+            transform: scale(0.97);
+        }
+
+        .action-btn .btn-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+
+        .action-btn .btn-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .action-btn .btn-time {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 4px;
+            transition: color 0.3s;
+        }
+
+        .action-btn.done .btn-time {
+            color: var(--green);
+        }
+
+        .action-btn.done {
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .action-btn.done::after {
+            content: '\f00c';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            font-size: 10px;
+            color: var(--green);
+            opacity: 0.8;
+        }
+
+        .btn-blue .btn-icon {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+        }
+
+        .btn-blue:hover,
+        .btn-blue:focus {
+            border-color: rgba(59, 130, 246, 0.4);
+            background: rgba(59, 130, 246, 0.08);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+        }
+
+        .btn-green .btn-icon {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
+        .btn-green:hover,
+        .btn-green:focus {
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.08);
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
+        }
+
+        .btn-amber .btn-icon {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber);
+        }
+
+        .btn-amber:hover,
+        .btn-amber:focus {
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.08);
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15);
+        }
+
+        .btn-purple .btn-icon {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent2);
+        }
+
+        .btn-purple:hover,
+        .btn-purple:focus {
+            border-color: rgba(99, 102, 241, 0.4);
+            background: rgba(99, 102, 241, 0.08);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+        }
+
+        .btn-red .btn-icon {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+        }
+
+        .btn-red:hover,
+        .btn-red:focus {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.08);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15);
+        }
+
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 8px 0;
+            position: relative;
+            opacity: 0.35;
+            transition: opacity 0.3s;
+        }
+
+        .timeline-item.recorded {
+            opacity: 1;
+        }
+
+        .timeline-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            left: 14px;
+            top: 32px;
+            width: 1px;
+            height: calc(100% - 8px);
+            background: var(--border2);
+        }
+
+        .tl-dot {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid var(--border2);
+            background: var(--surface2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: var(--text3);
+            flex-shrink: 0;
+            z-index: 1;
+            transition: all 0.3s;
+        }
+
+        .timeline-item.recorded .tl-dot {
+            border-color: var(--green);
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
+        .tl-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .tl-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text2);
+            line-height: 1;
+        }
+
+        .tl-time {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--text3);
+            margin-top: 3px;
+        }
+
+        .timeline-item.recorded .tl-time {
+            color: var(--green);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 0;
+        }
+
+        .stat-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 17px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border: none;
+            border-radius: var(--radius-sm);
+            color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 24px var(--accent-glow);
+            letter-spacing: -0.2px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .reset-btn {
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            border: 1px solid var(--border2);
+            border-radius: var(--radius-sm);
+            color: var(--text3);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            margin-top: 10px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .reset-btn:hover {
+            border-color: var(--red);
+            color: var(--red);
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--surface3);
+            border: 1px solid var(--border2);
+            border-radius: 100px;
+            padding: 12px 22px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--shadow-lg);
+            z-index: 9999;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            white-space: nowrap;
+            max-width: calc(100vw - 40px);
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.success i {
+            color: var(--green);
+        }
+
+        .toast.error i {
+            color: var(--red);
+        }
+
+        .toast.info i {
+            color: var(--accent);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 18px 0;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 100px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-green {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
+        .badge-amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber);
+        }
+
+        .badge-blue {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+        }
+
+        .email-field {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .email-field .field-input {
+            flex: 1;
+        }
+
+        .section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text3);
+            margin-bottom: 12px;
+        }
+
+        @media (max-width: 380px) {
+            .btn-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (min-width: 540px) {
+            .app-wrapper {
+                padding: 32px 24px 60px;
+            }
+
+            .card {
+                padding: 26px;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .shimmer {
+            animation: shimmer 1.5s ease-in-out;
+        }
+
+        @keyframes shimmer {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-wrapper">
+
+        <header>
+            <div class="logo">
+                <div class="logo-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <div class="logo-text">Time<span>Track</span></div>
+            </div>
+            <div class="live-clock">
+                <div class="time" id="liveClock">--:--:--</div>
+                <div class="date" id="liveDate">---</div>
+            </div>
+        </header>
+
+        <div class="status-bar fade-in">
+            <div>
+                <div class="status-label">Status</div>
+                <div class="status-value" id="currentStatus">Bereit zur Erfassung</div>
+            </div>
+            <div class="status-dot" id="statusDot"></div>
+        </div>
+
+        <div class="card fade-in" style="animation-delay:0.05s">
+            <div class="card-header">
+                <div class="card-icon blue"><i class="fa-solid fa-user-hard-hat"></i></div>
+                <div>
+                    <div class="card-title">Mitarbeiter</div>
+                    <div class="card-subtitle">Pflichtfeld vor der Zeiterfassung</div>
+                </div>
+            </div>
+            <div class="field-group">
+                <div>
+                    <div class="field-label">Name</div>
+                    <input type="text" class="field-input" id="employeeName" placeholder="Vor- und Nachname eingeben…"
+                        autocomplete="name">
+                </div>
+                <div>
+                    <div class="field-label">Datum</div>
+                    <input type="date" class="field-input" id="workDate">
+                </div>
+                <div>
+                    <div class="field-label">Baustelle / Projekt</div>
+                    <input type="text" class="field-input" id="projectName" placeholder="z. B. Baustelle München Nord…">
+                </div>
+            </div>
+        </div>
+
+        <div class="card fade-in" style="animation-delay:0.1s">
+            <div class="card-header">
+                <div class="card-icon blue"><i class="fa-solid fa-car"></i></div>
+                <div>
+                    <div class="card-title">Fahrt</div>
+                    <div class="card-subtitle">Anfahrt zur Baustelle</div>
+                </div>
+            </div>
+            <div class="btn-grid">
+                <button class="action-btn btn-blue" id="btn_fahrtbeginn" onclick="stamp('fahrtbeginn')">
+                    <div class="btn-icon"><i class="fa-solid fa-play"></i></div>
+                    <div class="btn-label">Fahrtbeginn</div>
+                    <div class="btn-time" id="time_fahrtbeginn">Nicht gestempelt</div>
+                </button>
+                <button class="action-btn btn-purple" id="btn_ankunft" onclick="stamp('ankunft')">
+                    <div class="btn-icon"><i class="fa-solid fa-location-dot"></i></div>
+                    <div class="btn-label">Ankunft Baustelle</div>
+                    <div class="btn-time" id="time_ankunft">Nicht gestempelt</div>
+                </button>
+            </div>
+        </div>
+
+        <div class="card fade-in" style="animation-delay:0.15s">
+            <div class="card-header">
+                <div class="card-icon green"><i class="fa-solid fa-hammer"></i></div>
+                <div>
+                    <div class="card-title">Arbeitszeit</div>
+                    <div class="card-subtitle">Arbeits- und Pausenzeiten</div>
+                </div>
+            </div>
+            <div class="btn-grid">
+                <button class="action-btn btn-green" id="btn_arbeitsbeginn" onclick="stamp('arbeitsbeginn')">
+                    <div class="btn-icon"><i class="fa-solid fa-briefcase"></i></div>
+                    <div class="btn-label">Arbeitsbeginn</div>
+                    <div class="btn-time" id="time_arbeitsbeginn">Nicht gestempelt</div>
+                </button>
+                <button class="action-btn btn-red" id="btn_arbeitsende" onclick="stamp('arbeitsende')">
+                    <div class="btn-icon"><i class="fa-solid fa-stop"></i></div>
+                    <div class="btn-label">Arbeitsende</div>
+                    <div class="btn-time" id="time_arbeitsende">Nicht gestempelt</div>
+                </button>
+                <button class="action-btn btn-amber" id="btn_pausebeginn" onclick="stamp('pausebeginn')">
+                    <div class="btn-icon"><i class="fa-solid fa-mug-hot"></i></div>
+                    <div class="btn-label">Pause Beginn</div>
+                    <div class="btn-time" id="time_pausebeginn">Nicht gestempelt</div>
+                </button>
+                <button class="action-btn btn-amber" id="btn_pauseende" onclick="stamp('pauseende')">
+                    <div class="btn-icon"><i class="fa-solid fa-mug-saucer"></i></div>
+                    <div class="btn-label">Pause Ende</div>
+                    <div class="btn-time" id="time_pauseende">Nicht gestempelt</div>
+                </button>
+            </div>
+        </div>
+
+        <div class="card fade-in" style="animation-delay:0.2s">
+            <div class="card-header">
+                <div class="card-icon purple"><i class="fa-solid fa-chart-simple"></i></div>
+                <div>
+                    <div class="card-title">Tagesübersicht</div>
+                    <div class="card-subtitle">Berechnete Zeiten</div>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value" id="stat_fahrt">—</div>
+                    <div class="stat-label">Fahrtzeit</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat_arbeit">—</div>
+                    <div class="stat-label">Arbeitszeit</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat_pause">—</div>
+                    <div class="stat-label">Pause</div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section-title">Zeitverlauf</div>
+            <div class="timeline" id="timeline">
+                <div class="timeline-item" id="tl_fahrtbeginn">
+                    <div class="tl-dot"><i class="fa-solid fa-play" style="font-size:8px"></i></div>
+                    <div class="tl-content">
+                        <div class="tl-label">Fahrtbeginn</div>
+                        <div class="tl-time" id="tl_time_fahrtbeginn">—</div>
+                    </div>
+                </div>
+                <div class="timeline-item" id="tl_ankunft">
+                    <div class="tl-dot"><i class="fa-solid fa-location-dot" style="font-size:8px"></i></div>
+                    <div class="tl-content">
+                        <div class="tl-label">Ankunft Baustelle</div>
+                        <div class="tl-time" id="tl_time_ankunft">—</div>
+                    </div>
+                </div>
+                <div class="timeline-item" id="tl_arbeitsbeginn">
+                    <div class="tl-dot"><i class="fa-solid fa-briefcase" style="font-size:8px"></i></div>
+                    <div class="tl-content">
+                        <div class="tl-label">Arbeitsbeginn</div>
+                        <div class="tl-time" id="tl_time_arbeitsbeginn">—</div>
+                    </div>
+                </div>
+                <div class="timeline-item" id="tl_pausebeginn">
+                    <div class="tl-dot"><i class="fa-solid fa-mug-hot" style="font-size:8px"></i></div>
+                    <div class="tl-content">
+                        <div class="tl-label">Pause Beginn</div>
+                        <div class="tl-time" id="tl_time_pausebeginn">—</div>
+                    </div>
+                </div>
+                <div class="timeline-item" id="tl_pauseende">
+                    <div class="tl-dot"><i class="fa-solid fa-mug-saucer" style="font-size:8px"></i></div>
+                    <div class="tl-content">
+                        <div class="tl-label">Pause Ende</div>
+                        <div class="tl-time" id="tl_time_pauseende">—</div>
+                    </div>
+                </div>
+                <div class="timeline-item" id="tl_arbeitsende">
+                    <div class="tl-dot"><i class="fa-solid fa-stop" style="font-size:8px"></i></div>
+                    <div class="tl-content">
+                        <div class="tl-label">Arbeitsende</div>
+                        <div class="tl-time" id="tl_time_arbeitsende">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card fade-in" style="animation-delay:0.25s">
+            <div class="card-header">
+                <div class="card-icon green"><i class="fa-solid fa-paper-plane"></i></div>
+                <div>
+                    <div class="card-title">Formular senden</div>
+                    <div class="card-subtitle">Excel-Export & E-Mail-Versand</div>
+                </div>
+            </div>
+            <div>
+                <div class="field-label">Empfänger E-Mail</div>
+                <input type="email" class="field-input" id="recipientEmail" placeholder="buero@firma.de" value="">
+            </div>
+            <div style="margin-top:12px">
+                <div class="field-label">Notizen (optional)</div>
+                <input type="text" class="field-input" id="notes" placeholder="Besonderheiten, Materialien…">
+            </div>
+            <div style="margin-top:20px">
+                <button class="submit-btn" onclick="sendForm()" id="submitBtn">
+                    <i class="fa-solid fa-file-excel"></i>
+                    Formular senden & Excel exportieren
+                </button>
+                <button class="reset-btn" onclick="resetForm()">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    Neuen Tag beginnen
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Gespeichert</span>
+    </div>
+
+    <script>
+        const stamps = {};
+
+        const statusMap = {
+            fahrtbeginn: 'Auf der Fahrt zur Baustelle',
+            ankunft: 'Angekommen auf der Baustelle',
+            arbeitsbeginn: 'Arbeit läuft',
+            pausebeginn: 'Pause aktiv',
+            pauseende: 'Zurück von der Pause',
+            arbeitsende: 'Arbeitstag beendet'
+        };
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+
+        function formatTime(d) {
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function formatDateTime(d) {
+            return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${formatTime(d)}`;
+        }
+
+        function diffHM(start, end) {
+            if (!start || !end) return '—';
+            const diff = Math.floor((end - start) / 60000);
+            if (diff < 0) return '—';
+            const h = Math.floor(diff / 60);
+            const m = diff % 60;
+            return `${pad(h)}:${pad(m)}`;
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('liveClock').textContent = formatTime(now);
+            const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+            const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+            document.getElementById('liveDate').textContent = `${days[now.getDay()]}, ${now.getDate()}. ${months[now.getMonth()]} ${now.getFullYear()}`;
+        }
+
+        function setDefaultDate() {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = pad(today.getMonth() + 1);
+            const d = pad(today.getDate());
+            document.getElementById('workDate').value = `${y}-${m}-${d}`;
+        }
+
+        function stamp(key) {
+            const name = document.getElementById('employeeName').value.trim();
+            if (!name) {
+                showToast('Bitte zuerst den Namen eingeben!', 'error');
+                document.getElementById('employeeName').focus();
+                return;
+            }
+            if (stamps[key]) {
+                showToast('Bereits gestempelt!', 'error');
+                return;
+            }
+            const now = new Date();
+            stamps[key] = now;
+            const timeStr = formatTime(now);
+            document.getElementById(`time_${key}`).textContent = timeStr;
+            document.getElementById(`btn_${key}`).classList.add('done');
+            document.getElementById(`tl_${key}`).classList.add('recorded');
+            document.getElementById(`tl_time_${key}`).textContent = timeStr;
+            document.getElementById('currentStatus').textContent = statusMap[key] || 'Aktiv';
+            document.getElementById('statusDot').classList.add('active');
+            updateStats();
+            showToast(`${getLabelFor(key)} — ${timeStr}`, 'success');
+        }
+
+        function getLabelFor(key) {
+            const map = {
+                fahrtbeginn: 'Fahrtbeginn', ankunft: 'Ankunft Baustelle',
+                arbeitsbeginn: 'Arbeitsbeginn', pausebeginn: 'Pause Beginn',
+                pauseende: 'Pause Ende', arbeitsende: 'Arbeitsende'
+            };
+            return map[key] || key;
+        }
+
+        function updateStats() {
+            document.getElementById('stat_fahrt').textContent = diffHM(stamps.fahrtbeginn, stamps.ankunft);
+            document.getElementById('stat_arbeit').textContent = diffHM(stamps.arbeitsbeginn, stamps.arbeitsende);
+            document.getElementById('stat_pause').textContent = diffHM(stamps.pausebeginn, stamps.pauseende);
+        }
+
+        let toastTimer;
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('i');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.className = 'toast show ' + type;
+            icon.className = type === 'success' ? 'fa-solid fa-circle-check' :
+                type === 'error' ? 'fa-solid fa-circle-xmark' :
+                    'fa-solid fa-circle-info';
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+        }
+
+        function sendForm() {
+            const name = document.getElementById('employeeName').value.trim();
+            const date = document.getElementById('workDate').value;
+            const project = document.getElementById('projectName').value.trim();
+            const email = document.getElementById('recipientEmail').value.trim();
+            const notesVal = document.getElementById('notes').value.trim();
+
+            if (!name) { showToast('Bitte Namen eingeben!', 'error'); return; }
+            if (!stamps.arbeitsbeginn && !stamps.fahrtbeginn) {
+                showToast('Keine Zeitstempel vorhanden!', 'error'); return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Wird gesendet…';
+
+            const data = {
+                employee_name: name,
+                work_date: date,
+                project_name: project,
+                recipient_email: email,
+                notes: notesVal,
+                fahrtbeginn: stamps.fahrtbeginn ? stamps.fahrtbeginn.toISOString() : null,
+                ankunft: stamps.ankunft ? stamps.ankunft.toISOString() : null,
+                arbeitsbeginn: stamps.arbeitsbeginn ? stamps.arbeitsbeginn.toISOString() : null,
+                pausebeginn: stamps.pausebeginn ? stamps.pausebeginn.toISOString() : null,
+                pauseende: stamps.pauseende ? stamps.pauseende.toISOString() : null,
+                arbeitsende: stamps.arbeitsende ? stamps.arbeitsende.toISOString() : null
+            };
+
+            fetch('api_simple.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    createLocalExcelFile(name, date, project, notesVal);
+                    
+                    showToast('Zeiterfassung erfolgreich gesendet!', 'success');
+                    
+                    setTimeout(() => {
+                        resetForm();
+                    }, 2000);
+                } else {
+                    throw new Error(result.message || 'Fehler beim Senden');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Fehler beim Senden: ' + error.message, 'error');
+                
+                createLocalExcelFile(name, date, project, notesVal);
+                showToast('Daten lokal gespeichert (Backup)', 'info');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-file-excel"></i> Formular senden & Excel exportieren';
+            });
+        }
+
+        function createLocalExcelFile(name, date, project, notesVal) {
+            const rows = [
+                ['Zeiterfassung — TimeTrack Pro'],
+                [],
+                ['Mitarbeiter:', name],
+                ['Datum:', date],
+                ['Baustelle / Projekt:', project || '—'],
+                ['Notizen:', notesVal || '—'],
+                [],
+                ['Ereignis', 'Uhrzeit', 'Datum'],
+                ...['fahrtbeginn','ankunft','arbeitsbeginn','pausebeginn','pauseende','arbeitsende'].map(k => [
+                    getLabelFor(k),
+                    stamps[k] ? formatTime(stamps[k]) : '—',
+                    stamps[k] ? `${pad(stamps[k].getDate())}.${pad(stamps[k].getMonth()+1)}.${stamps[k].getFullYear()}` : '—'
+                ]),
+                [],
+                ['Berechnungen', 'Dauer (hh:mm)'],
+                ['Fahrtzeit', diffHM(stamps.fahrtbeginn, stamps.ankunft)],
+                ['Arbeitszeit (brutto)', diffHM(stamps.arbeitsbeginn, stamps.arbeitsende)],
+                ['Pausenzeit', diffHM(stamps.pausebeginn, stamps.pauseende)],
+                ['Arbeitszeit (netto)', calcNetto()]
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            ws['!cols'] = [{wch:28},{wch:12},{wch:16}];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Zeiterfassung');
+
+            const safeName = name.replace(/\s+/g, '_');
+            const safeDate = date.replace(/-/g, '');
+            const filename = `Zeiterfassung_${safeName}_${safeDate}.xlsx`;
+
+            XLSX.writeFile(wb, filename);
+        }
+
+        function calcNetto() {
+            if (!stamps.arbeitsbeginn || !stamps.arbeitsende) return '—';
+            let work = stamps.arbeitsende - stamps.arbeitsbeginn;
+            if (stamps.pausebeginn && stamps.pauseende) {
+                work -= (stamps.pauseende - stamps.pausebeginn);
+            }
+            const mins = Math.floor(work / 60000);
+            if (mins < 0) return '—';
+            return `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`;
+        }
+
+        function resetForm() {
+            if (!confirm('Alle Zeitstempel löschen und neu beginnen?')) return;
+            Object.keys(stamps).forEach(k => delete stamps[k]);
+            document.getElementById('employeeName').value = '';
+            document.getElementById('projectName').value = '';
+            document.getElementById('notes').value = '';
+            setDefaultDate();
+            ['fahrtbeginn', 'ankunft', 'arbeitsbeginn', 'pausebeginn', 'pauseende', 'arbeitsende'].forEach(k => {
+                document.getElementById(`time_${k}`).textContent = 'Nicht gestempelt';
+                document.getElementById(`btn_${k}`).classList.remove('done');
+                document.getElementById(`tl_${k}`).classList.remove('recorded');
+                document.getElementById(`tl_time_${k}`).textContent = '—';
+            });
+            document.getElementById('stat_fahrt').textContent = '—';
+            document.getElementById('stat_arbeit').textContent = '—';
+            document.getElementById('stat_pause').textContent = '—';
+            document.getElementById('currentStatus').textContent = 'Bereit zur Erfassung';
+            document.getElementById('statusDot').classList.remove('active');
+            showToast('Neuer Tag gestartet', 'info');
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+        setDefaultDate();
+    </script>
+</body>
+
+</html>
